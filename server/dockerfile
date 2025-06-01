@@ -1,0 +1,33 @@
+# server/Dockerfile
+
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app/server
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential libpq-dev curl && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install Poetry
+RUN curl -sSL https://install.python-poetry.org | python3 -
+ENV PATH="/root/.local/bin:$PATH"
+
+# 👇 Copy pyproject.toml and poetry.lock from root project dir
+COPY pyproject.toml poetry.lock* /app/
+
+# 👇 Install dependencies
+RUN poetry config virtualenvs.create false && \
+    poetry install --no-interaction --no-ansi --no-root
+    
+# 👇 Now copy the rest of the code
+COPY . /app/
+
+# 👇 Move into Django project directory
+WORKDIR /app/server
+
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
