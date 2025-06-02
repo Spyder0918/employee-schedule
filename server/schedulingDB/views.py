@@ -1,8 +1,11 @@
 from rest_framework import viewsets, permissions, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
+from django.core.mail import send_mail
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
+from django.contrib.auth.models import User
 from datetime import datetime
 from .models import User, Shift, Availability, PTORequest, ShiftSwap
 from .serializers import UserSerializer, ShiftSerializer, AvailabilitySerializer, PTORequestSerializer, ShiftSwapSerializer
@@ -149,3 +152,24 @@ class ShiftSwapViewSet(viewsets.ModelViewSet):
         swap_request.status = 'rejected'
         swap_request.save()
         return Response(ShiftSwapSerializer(swap_request).data)
+    
+class ForgotPasswordView(APIView):
+    def post(self, request):
+        email = request.data.get("email")
+        try:
+            user = User.objects.get(email=email)
+            temp_password = User.objects.make_random_password()
+            user.set_password(temp_password)
+            user.save()
+
+            send_mail(
+                'Password Reset',
+                f'Your temporary password is: {temp_password}',
+                'no-reply@yourdomain.com',
+                [email],
+                fail_silently=False,
+            )
+
+            return Response({"message": "Temporary password sent"}, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
