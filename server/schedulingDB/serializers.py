@@ -1,10 +1,29 @@
 from rest_framework import serializers
-from .models import User, Shift, Availability, PTORequest, ShiftSwap
+from .models import User, Shift, Availability, PTORequest, ShiftSwap, PasswordResetToken
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'role']
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+    password_confirm = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        if data['password'] != data['password_confirm']:
+            raise serializers.ValidationError("Passwords don't match")
+        try:
+            validate_password(data['password'])
+        except ValidationError as e:
+            raise serializers.ValidationError({'password': list(e.messages)})
+        return data
 
 class ShiftSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
