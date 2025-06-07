@@ -8,6 +8,7 @@ import {
   startOfDay,
   endOfDay,
   isWithinInterval,
+  differenceInMinutes,
 } from 'date-fns';
 import { CalendarEvent } from './types';
 
@@ -32,18 +33,25 @@ export const WeekView: React.FC<WeekViewProps> = ({
     end: endOfDay(currentDate),
   });
 
-  const getEventsForDayAndHour = (day: Date, hour: Date) => {
+  const getEventsForDay = (day: Date) => {
     return events.filter((event) => {
       const eventStart = new Date(event.start);
-      const eventEnd = new Date(event.end);
-      const hourEnd = new Date(hour);
-      hourEnd.setHours(hour.getHours() + 1);
-
-      return (
-        format(eventStart, 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd') &&
-        isWithinInterval(hour, { start: eventStart, end: eventEnd })
-      );
+      return format(eventStart, 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd');
     });
+  };
+
+  const calculateEventPosition = (event: CalendarEvent) => {
+    const eventStart = new Date(event.start);
+    const dayStart = startOfDay(eventStart);
+    const minutesFromDayStart = differenceInMinutes(eventStart, dayStart);
+    const eventDuration = differenceInMinutes(event.end, event.start);
+
+    // Each hour block is 80px high (h-20 = 5rem = 80px)
+    const hourHeight = 80;
+    const top = (minutesFromDayStart / 60) * hourHeight;
+    const height = (eventDuration / 60) * hourHeight;
+
+    return { top, height };
   };
 
   return (
@@ -70,34 +78,37 @@ export const WeekView: React.FC<WeekViewProps> = ({
           ))}
         </div>
         {days.map((day) => (
-          <div key={day.toString()} className="border-l">
-            {hours.map((hour) => {
-              const hourEvents = getEventsForDayAndHour(day, hour);
+          <div key={day.toString()} className="border-l relative">
+            {hours.map((hour) => (
+              <div
+                key={hour.toString()}
+                className="h-20 border-b"
+                onClick={() => {
+                  const selectedDate = new Date(day);
+                  selectedDate.setHours(hour.getHours());
+                  onDateSelect?.(selectedDate);
+                }}
+              />
+            ))}
+            {getEventsForDay(day).map((event) => {
+              const { top, height } = calculateEventPosition(event);
               return (
                 <div
-                  key={hour.toString()}
-                  className="h-20 border-b relative"
-                  onClick={() => {
-                    const selectedDate = new Date(day);
-                    selectedDate.setHours(hour.getHours());
-                    onDateSelect?.(selectedDate);
+                  key={event.id}
+                  className="absolute left-0 right-0 mx-1 bg-blue-100 text-blue-800 p-1 rounded overflow-hidden cursor-pointer"
+                  style={{
+                    top: `${top}px`,
+                    height: `${height}px`,
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEventClick?.(event);
                   }}
                 >
-                  {hourEvents.map((event) => (
-                    <div
-                      key={event.id}
-                      className="absolute left-0 right-0 mx-1 bg-blue-100 text-blue-800 text-xs p-1 rounded overflow-hidden cursor-pointer"
-                      style={{
-                        top: '4px',
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEventClick?.(event);
-                      }}
-                    >
-                      {event.title}
-                    </div>
-                  ))}
+                  <div className="text-xs font-medium truncate">{event.title}</div>
+                  <div className="text-xs truncate">
+                    {format(new Date(event.start), 'h:mm a')} - {format(new Date(event.end), 'h:mm a')}
+                  </div>
                 </div>
               );
             })}
