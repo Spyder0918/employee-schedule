@@ -16,7 +16,8 @@ const CalendarPage: React.FC = () => {
       try {
         // Check if we're already logged in
         if (!localStorage.getItem('token')) {
-          await login('testuser', 'testpass123');
+          navigate('/login');
+          return;
         }
 
         const shifts = await getShifts();
@@ -27,7 +28,7 @@ const CalendarPage: React.FC = () => {
           title: `${shift.role} - ${shift.location}`,
           start: new Date(shift.start_time),
           end: new Date(shift.end_time),
-          description: `${shift.user.username}'s shift at ${shift.location}`,
+          description: shift.user ? `${shift.user.username}'s shift at ${shift.location}` : `Unassigned shift at ${shift.location}`,
           shift: shift
         }));
 
