@@ -12,12 +12,11 @@ export const login = async (username: string, password: string): Promise<AuthRes
   });
 
   if (!response.ok) {
-    throw new Error('Login failed');
+    const error = await response.json();
+    throw new Error(error.detail || 'Invalid username or password');
   }
 
   const data = await response.json();
-  localStorage.setItem('token', data.access);
-  localStorage.setItem('refreshToken', data.refresh);
   return data;
 };
 

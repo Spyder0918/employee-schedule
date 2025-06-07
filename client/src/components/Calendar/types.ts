@@ -34,6 +34,7 @@ export interface CalendarProps {
 export interface AuthResponse {
   access: string;
   refresh: string;
+  user: User;
 }
 
 export interface AuthState {
