@@ -6,9 +6,14 @@ from django.core.mail import send_mail
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from django.contrib.auth.models import User
-from datetime import datetime
-from .models import User, Shift, Availability, PTORequest, ShiftSwap
-from .serializers import UserSerializer, ShiftSerializer, AvailabilitySerializer, PTORequestSerializer, ShiftSwapSerializer
+from datetime import datetime, timedelta
+import secrets
+from .models import User, Shift, Availability, PTORequest, ShiftSwap, PasswordResetToken
+from .serializers import (
+    UserSerializer, ShiftSerializer, AvailabilitySerializer, 
+    PTORequestSerializer, ShiftSwapSerializer,
+    PasswordResetRequestSerializer, PasswordResetConfirmSerializer
+)
 
 class IsAdminOrReadOnly(permissions.BasePermission):
     def has_permission(self, request, view):
@@ -153,23 +158,88 @@ class ShiftSwapViewSet(viewsets.ModelViewSet):
         swap_request.save()
         return Response(ShiftSwapSerializer(swap_request).data)
     
-class ForgotPasswordView(APIView):
+class PasswordResetRequestView(APIView):
+    permission_classes = [permissions.AllowAny]
+    
     def post(self, request):
-        email = request.data.get("email")
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        email = serializer.validated_data['email']
         try:
             user = User.objects.get(email=email)
-            temp_password = User.objects.make_random_password()
-            user.set_password(temp_password)
-            user.save()
-
+            
+            # Generate a secure token
+            token = secrets.token_urlsafe(32)
+            expires_at = timezone.now() + timedelta(hours=24)
+            
+            # Create or update the reset token
+            PasswordResetToken.objects.filter(user=user).delete()  # Remove any existing tokens
+            reset_token = PasswordResetToken.objects.create(
+                user=user,
+                token=token,
+                expires_at=expires_at
+            )
+            
+            # Send email with reset link
+            reset_url = f"http://localhost:3000/reset-password?token={token}"
             send_mail(
-                'Password Reset',
-                f'Your temporary password is: {temp_password}',
-                'no-reply@yourdomain.com',
+                'Password Reset Request',
+                f'Click the following link to reset your password: {reset_url}\n\n'
+                f'This link will expire in 24 hours.\n\n'
+                f'If you did not request this password reset, please ignore this email.',
+                'noreply@yourdomain.com',
                 [email],
                 fail_silently=False,
             )
-
-            return Response({"message": "Temporary password sent"}, status=status.HTTP_200_OK)
+            
+            return Response(
+                {"message": "Password reset instructions have been sent to your email."},
+                status=status.HTTP_200_OK
+            )
         except User.DoesNotExist:
-            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            # Don't reveal that the user doesn't exist
+            return Response(
+                {"message": "If an account exists with this email, you will receive password reset instructions."},
+                status=status.HTTP_200_OK
+            )
+
+class PasswordResetConfirmView(APIView):
+    permission_classes = [permissions.AllowAny]
+    
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        token = serializer.validated_data['token']
+        new_password = serializer.validated_data['password']
+        
+        try:
+            reset_token = PasswordResetToken.objects.get(token=token)
+            
+            if not reset_token.is_valid():
+                return Response(
+                    {"error": "Invalid or expired token."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Update the user's password
+            user = reset_token.user
+            user.set_password(new_password)
+            user.save()
+            
+            # Mark the token as used
+            reset_token.is_used = True
+            reset_token.save()
+            
+            return Response(
+                {"message": "Password has been reset successfully."},
+                status=status.HTTP_200_OK
+            )
+        except PasswordResetToken.DoesNotExist:
+            return Response(
+                {"error": "Invalid token."},
+                status=status.HTTP_400_BAD_REQUEST
+            )

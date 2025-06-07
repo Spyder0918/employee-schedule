@@ -20,7 +20,6 @@ from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
-from .views import ForgotPasswordView
 
 urlpatterns = [
     path('api/', include('schedulingDB.urls')),  # Replace with your actual app name
