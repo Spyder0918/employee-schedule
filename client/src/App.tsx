@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import LoginPage from "./pages/Login";
 import PasswordResetRequest from "./pages/PasswordResetRequest";
 import PasswordResetConfirm from "./pages/PasswordResetConfirm";
+import CalendarPage from "./pages/Calendar";
 
 function App() {
   return (
@@ -13,8 +14,9 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/forgot-password" element={<PasswordResetRequest />} />
           <Route path="/reset-password" element={<PasswordResetConfirm />} />
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          <Route path="/calendar" element={<CalendarPage />} />
+          <Route path="/" element={<Navigate to="/calendar" replace />} />
+          <Route path="*" element={<Navigate to="/calendar" replace />} />
         </Routes>
       </div>
     </Router>
